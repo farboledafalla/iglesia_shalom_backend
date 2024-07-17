@@ -1,5 +1,3 @@
-console.log('Hola usando --watch con node');
-
 // Conexión a la bd
 require('./config/conexion');
 
