@@ -16,6 +16,10 @@ app.use(express.json());
 // Configurar el puerto
 app.set('port', port);
 
+// CORS
+const cors = require('cors');
+app.use(cors());
+
 // Las rutas iniciarán a partir de '/api'
 app.use('/api', require('./rutas'));
 
