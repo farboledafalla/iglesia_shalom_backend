@@ -108,12 +108,35 @@ rutas.delete('/ministerios/:id', (req, res) => {
 
 // Rutas para los miembros_ministerios
 // Todos los miembros_ministerios
-rutas.get('/miem_mini', function (req, res) {
+rutas.get('/miem-mini', function (req, res) {
    let sql =
-      'select mm.id_miembro,m.nombres,m.apellidos,mm.id_ministerio,mi.nombre from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio';
+      'select mm.id_miembro,concat(m.nombres," ",m.apellidos) as nombre_completo,mm.id_ministerio,mi.nombre,mm.fecha_ingreso,mm.fecha_retiro from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio';
    conexion.query(sql, (err, rows, fields) => {
       if (err) throw err;
       else res.json(rows);
+   });
+});
+
+// Agregar Miembro Ministerio
+rutas.post('/miem-mini', (req, res) => {
+   const { id_miembro, id_ministerio } = req.body;
+   let sql = `insert into miembro_ministerio(id_miembro,id_ministerio,fecha_ingreso) values(${id_miembro},${id_ministerio},DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`;
+   conexion.query(sql, (err, rows, fields) => {
+      if (err) {
+         throw err;
+         console.log('Error', err);
+      } else res.json({ status: 'Registro agregado' });
+   });
+});
+
+// Editar un Miembro Ministerio
+rutas.put('/miem-mini/:id', (req, res) => {
+   const { id } = req.params;
+   const { id_miembro, id_ministerio } = req.body;
+   let sql = `delete from miembro_ministerio where id_miembro = ${id_miembro} and id_ministerio = ${id_ministerio}`;
+   conexion.query(sql, (err, rows, fields) => {
+      if (err) throw err;
+      else res.json({ status: 'Registro editado' });
    });
 });
 
