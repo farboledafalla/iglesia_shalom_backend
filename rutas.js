@@ -174,13 +174,46 @@ rutas.get('/miem-mini', function (req, res) {
 // Agregar Miembro Ministerio
 rutas.post('/miem-mini', (req, res) => {
    const { id_miembro, id_ministerio } = req.body;
-   let sql = `insert into miembro_ministerio(id_miembro,id_ministerio,fecha_ingreso) values(${id_miembro},${id_ministerio},DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`;
-   conexion.query(sql, (err, rows, fields) => {
-      if (err) {
-         throw err;
-         console.log('Error', err);
-      } else res.json({ status: 'Registro agregado' });
-   });
+
+   // Verificar si ese miembro ya esá registrado en ese ministerio
+   const sqlExisteMiembroMinisterio =
+      'SELECT COUNT(*) as count FROM Miembro_Ministerio WHERE id_miembro = ? AND id_ministerio = ?';
+   conexion.query(
+      sqlExisteMiembroMinisterio,
+      [id_miembro, id_ministerio],
+      (err, result) => {
+         if (err) {
+            console.error(err);
+            return res
+               .status(500)
+               .json({
+                  status:
+                     'Error al verificar existencia de relación Miembro-Ministerio',
+               });
+         }
+
+         if (result[0].count > 0) {
+            return res
+               .status(400)
+               .json({
+                  status: 'Ya existe registrado el miembro en ese ministerio',
+               });
+         }
+
+         // Insertar registro
+         const sql = `insert into miembro_ministerio(id_miembro,id_ministerio,fecha_ingreso) values(?,?,DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))`;
+         conexion.query(sql, [id_miembro, id_ministerio], (err, result) => {
+            if (err) {
+               console.error(err);
+               return res
+                  .status(500)
+                  .json({ status: 'Error al insertar el registro' });
+            }
+
+            res.json({ status: 'Registro agregado' });
+         });
+      }
+   );
 });
 
 // Editar un Miembro Ministerio
