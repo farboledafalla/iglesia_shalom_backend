@@ -126,10 +126,37 @@ rutas.put('/ministerios/:id', (req, res) => {
 // Eliminar ministerio
 rutas.delete('/ministerios/:id', (req, res) => {
    const { id } = req.params;
-   let sql = `delete from ministerios where id_ministerio = ${id}`;
-   conexion.query(sql, (err, rows, fields) => {
-      if (err) throw err;
-      else res.json({ status: 'Ministerio eliminado' });
+
+   // Verificar si el ministerio está relacionado con algún miembro
+   const sqlCheckRelationsMinisterio =
+      'SELECT COUNT(*) as count FROM Miembro_Ministerio WHERE id_ministerio = ?';
+   conexion.query(sqlCheckRelationsMinisterio, [id], (err, result) => {
+      if (err) {
+         console.error(err);
+         return res
+            .status(500)
+            .json({ status: 'Error al verificar relaciones del ministerio' });
+      }
+
+      if (result[0].count > 0) {
+         return res.status(400).json({
+            status:
+               'No se puede eliminar el ministerios porque está relacionado con uno o más miembros',
+         });
+      }
+
+      // Eliminar el ministerio
+      const sql = `DELETE FROM ministerios WHERE id_ministerio = ${id}`;
+      conexion.query(sql, [id], (err, result) => {
+         if (err) {
+            console.error(err);
+            return res
+               .status(500)
+               .json({ status: 'Error al eliminar el ministerio' });
+         }
+
+         res.json({ status: 'Ministerio eliminado' });
+      });
    });
 });
 
@@ -187,6 +214,21 @@ rutas.put('/miem-mini/eliminar/:id_miembro/:id_ministerio', (req, res) => {
    conexion.query(sql, [id_miembro, id_ministerio], (err, rows, fields) => {
       if (err) throw err;
       else res.json({ status: 'Miembro retirado del ministerio' });
+   });
+});
+
+// Ruta para el drag and drop
+rutas.post('/relacionar', (req, res) => {
+   const { id_miembro, id_ministerio } = req.body;
+
+   const sql =
+      'INSERT INTO Miembro_Ministerio (id_miembro, id_ministerio, fecha_ingreso) VALUES (?, ?, DATE_FORMAT(NOW(), "%Y-%m-%d %H:%i:%s"))';
+   conexion.query(sql, [id_miembro, id_ministerio], (err, result) => {
+      if (err) {
+         console.error('Error relacionando miembro y ministerio:', err);
+         return res.status(500).send('Error relacionando miembro y ministerio');
+      }
+      res.status(200).send('Miembro y ministerio relacionado');
    });
 });
 
