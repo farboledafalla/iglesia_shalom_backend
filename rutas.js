@@ -31,7 +31,9 @@ rutas.post('/miembros', (req, res) => {
    conexion.query(sql, [cedula, nombres, apellidos, celular], (err, result) => {
       if (err) {
          if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({ error: 'Cédula duplicada' });
+            return res
+               .status(400)
+               .json({ error: `Cédula (${cedula}) duplicada` });
          }
 
          return res.status(500).json({ error: 'Error al insertar el miembro' });
@@ -112,10 +114,24 @@ rutas.get('/ministerios/:id', (req, res) => {
 // Agregar ministerio
 rutas.post('/ministerios', (req, res) => {
    const { nombre, descripcion } = req.body;
-   let sql = `insert into ministerios(nombre,descripcion) values('${nombre}','${descripcion}')`;
-   conexion.query(sql, (err, rows, fields) => {
-      if (err) throw err;
-      else res.json({ status: 'Ministerio agregado' });
+   let sql = `INSERT INTO ministerios(nombre,descripcion) VALUES(?,?)`;
+   conexion.query(sql, [nombre, descripcion], (err, result) => {
+      if (err) {
+         if (err.code === 'ER_DUP_ENTRY') {
+            return res
+               .status(400)
+               .json({ error: `Nombre (${nombre}) duplicado` });
+         }
+
+         return res
+            .status(500)
+            .json({ error: 'Error al insertar el ministerio' });
+      }
+
+      res.json({
+         status: 'Ministerio agregado',
+         id_ministerio: result.insertId,
+      });
    });
 });
 
