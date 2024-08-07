@@ -48,10 +48,37 @@ rutas.put('/miembros/:id', (req, res) => {
 // Eliminar miembro
 rutas.delete('/miembros/:id', (req, res) => {
    const { id } = req.params;
-   let sql = `delete from miembros where id_miembro = ${id}`;
-   conexion.query(sql, (err, rows, fields) => {
-      if (err) throw err;
-      else res.json({ status: 'Miembro eliminado' });
+
+   // Verificar si el miembro está relacionado con ministerios
+   const sqlCheckRelations =
+      'SELECT COUNT(*) as count FROM Miembro_Ministerio WHERE id_miembro = ?';
+   conexion.query(sqlCheckRelations, [id], (err, result) => {
+      if (err) {
+         console.error(err);
+         return res
+            .status(500)
+            .json({ status: 'Error al verificar relaciones del miembro' });
+      }
+
+      if (result[0].count > 0) {
+         return res.status(400).json({
+            status:
+               'No se puede eliminar el miembro porque está relacionado con uno o más ministerios',
+         });
+      }
+
+      // Eliminar miembro si no hay relaciones
+      const sql = `DELETE FROM miembros WHERE id_miembro = ?`;
+      conexion.query(sql, [id], (err, result) => {
+         if (err) {
+            console.error(err);
+            return res
+               .status(500)
+               .json({ status: 'Error al eliminar miembro' });
+         }
+
+         res.json({ status: 'Miembro eliminado' });
+      });
    });
 });
 
@@ -110,7 +137,7 @@ rutas.delete('/ministerios/:id', (req, res) => {
 // Todos los miembros_ministerios
 rutas.get('/miem-mini', function (req, res) {
    let sql =
-      'select mm.id_miembro,concat(m.nombres," ",m.apellidos) as nombre_completo,mm.id_ministerio,mi.nombre,mm.fecha_ingreso,mm.fecha_retiro from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio';
+      'select mm.id_miembro,concat(m.nombres," ",m.apellidos) as nombre_completo,mm.id_ministerio,mi.nombre,mm.fecha_ingreso,mm.fecha_retiro,mm.estado,mm.estado_eliminado from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio where mm.estado_eliminado = "A"';
    conexion.query(sql, (err, rows, fields) => {
       if (err) throw err;
       else res.json(rows);
@@ -130,13 +157,36 @@ rutas.post('/miem-mini', (req, res) => {
 });
 
 // Editar un Miembro Ministerio
-rutas.put('/miem-mini/:id', (req, res) => {
-   const { id } = req.params;
-   const { id_miembro, id_ministerio } = req.body;
-   let sql = `delete from miembro_ministerio where id_miembro = ${id_miembro} and id_ministerio = ${id_ministerio}`;
+rutas.put('/miem-mini/:id_miembro/:id_ministerio', (req, res) => {
+   const { id_miembro, id_ministerio } = req.params;
+   const { fechaIngreso } = req.body;
+   let sql = `update miembro_ministerio set fecha_ingreso = '${fechaIngreso}' where id_miembro = ${id_miembro} and id_ministerio = ${id_ministerio}`;
    conexion.query(sql, (err, rows, fields) => {
       if (err) throw err;
       else res.json({ status: 'Registro editado' });
+   });
+});
+
+// Retirar un Miembro de un Ministerio
+rutas.put('/miem-mini/retirar/:id_miembro/:id_ministerio', (req, res) => {
+   const { id_miembro, id_ministerio } = req.params;
+   let sql = `update miembro_ministerio set fecha_retiro = DATE_FORMAT(
+      NOW(),
+      '%Y-%m-%d %H:%i:%s'
+   ), estado = 'C' where id_miembro = ? and id_ministerio = ?`;
+   conexion.query(sql, [id_miembro, id_ministerio], (err, rows, fields) => {
+      if (err) throw err;
+      else res.json({ status: 'Miembro retirado del ministerio' });
+   });
+});
+
+// Eliminar registro Miembro - Ministerio
+rutas.put('/miem-mini/eliminar/:id_miembro/:id_ministerio', (req, res) => {
+   const { id_miembro, id_ministerio } = req.params;
+   let sql = `update miembro_ministerio set estado_eliminado = 'C' where id_miembro = ? and id_ministerio = ?`;
+   conexion.query(sql, [id_miembro, id_ministerio], (err, rows, fields) => {
+      if (err) throw err;
+      else res.json({ status: 'Miembro retirado del ministerio' });
    });
 });
 
