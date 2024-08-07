@@ -27,10 +27,17 @@ rutas.get('/miembros/:id', (req, res) => {
 // Agregar miembro
 rutas.post('/miembros', (req, res) => {
    const { cedula, nombres, apellidos, celular } = req.body;
-   let sql = `insert into miembros(cedula,nombres,apellidos,celular) values(${cedula},'${nombres}','${apellidos}',${celular})`;
-   conexion.query(sql, (err, rows, fields) => {
-      if (err) throw err;
-      else res.json({ status: 'Miembro agregado' });
+   let sql = `INSERT INTO miembros(cedula,nombres,apellidos,celular) VALUES(?,?,?,?)`;
+   conexion.query(sql, [cedula, nombres, apellidos, celular], (err, result) => {
+      if (err) {
+         if (err.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ error: 'Cédula duplicada' });
+         }
+
+         return res.status(500).json({ error: 'Error al insertar el miembro' });
+      }
+
+      res.json({ status: 'Miembro agregado', id_miembro: result.insertId });
    });
 });
 
@@ -184,20 +191,16 @@ rutas.post('/miem-mini', (req, res) => {
       (err, result) => {
          if (err) {
             console.error(err);
-            return res
-               .status(500)
-               .json({
-                  status:
-                     'Error al verificar existencia de relación Miembro-Ministerio',
-               });
+            return res.status(500).json({
+               status:
+                  'Error al verificar existencia de relación Miembro-Ministerio',
+            });
          }
 
          if (result[0].count > 0) {
-            return res
-               .status(400)
-               .json({
-                  status: 'Ya existe registrado el miembro en ese ministerio',
-               });
+            return res.status(400).json({
+               status: 'Ya existe registrado el miembro en ese ministerio',
+            });
          }
 
          // Insertar registro
