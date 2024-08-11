@@ -1,8 +1,11 @@
 // Conexión a la bd
 require('./config/conexion');
 
-// Incluir express
+// Módulos
 const express = require('express');
+const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // Definir puerto
 const port = process.env.port || 3000;
@@ -17,7 +20,6 @@ app.use(express.json());
 app.set('port', port);
 
 // CORS
-const cors = require('cors');
 app.use(cors());
 
 // Las rutas iniciarán a partir de '/api'
