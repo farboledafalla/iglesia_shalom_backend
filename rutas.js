@@ -1,6 +1,9 @@
 // Router de express
 const rutas = require('express').Router();
 
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 // Conexión a la bd
 const conexion = require('./config/conexion');
 
@@ -282,6 +285,83 @@ rutas.post('/relacionar', (req, res) => {
       }
       res.status(200).send('Miembro y ministerio relacionado');
    });
+});
+
+// Autenticación
+const secretKey = 'your_secret_key';
+
+// Registro
+rutas.post('/register', (req, res) => {
+   const { username, password } = req.body;
+   const hashedPassword = bcrypt.hashSync(password, 8);
+
+   const sql = 'INSERT INTO Usuarios (username, password) VALUES (?, ?)';
+   conexion.query(sql, [username, hashedPassword], (err, result) => {
+      if (err) {
+         return res
+            .status(500)
+            .json({ error: 'Error al registrar el usuario' });
+      }
+      res.json({ status: 'Usuario registrado' });
+   });
+});
+
+// Inicio de sesión
+rutas.post('/login', (req, res) => {
+   const { username, password } = req.body;
+
+   const sql = 'SELECT * FROM Usuarios WHERE username = ?';
+   conexion.query(sql, [username], (err, results) => {
+      if (err) {
+         return res.status(500).json({ error: 'Error al buscar el usuario' });
+      }
+      if (results.length === 0) {
+         return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      const user = results[0];
+      const passwordIsValid = bcrypt.compareSync(password, user.password);
+
+      if (!passwordIsValid) {
+         return res.status(401).json({ error: 'Contraseña incorrecta' });
+      }
+
+      // Creación del token usando datos del usuario
+      const token = jwt.sign(
+         { id: user.id, username: user.username },
+         secretKey,
+         {
+            expiresIn: 3600, // 2 horas, (86400) 24 horas
+         }
+      );
+
+      res.json({ auth: true, token });
+   });
+});
+
+// Middleware para verificar el token
+function verifyToken(req, res, next) {
+   const token = req.headers['x-access-token'];
+   if (!token) {
+      return res.status(403).json({ auth: false, message: 'No existe token' });
+   }
+
+   jwt.verify(token, secretKey, (err, decoded) => {
+      if (err) {
+         return res
+            .status(500)
+            .json({ auth: false, message: 'Falló autenticación del token' });
+      }
+      // Pasar los datos del usuario
+      req.userId = decoded.id;
+      req.username = decoded.username;
+      next();
+   });
+}
+
+// Ruta protegida de ejemplo
+rutas.get('/me', verifyToken, (req, res) => {
+   res.json({ id: req.userId, username: req.username });
 });
 
 // Exportar la ruta
