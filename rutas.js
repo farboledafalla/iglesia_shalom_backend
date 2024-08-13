@@ -364,5 +364,55 @@ rutas.get('/me', verifyToken, (req, res) => {
    res.json({ id: req.userId, username: req.username });
 });
 
+// Paginación
+rutas.get('/pag_miembros', (req, res) => {
+   const page = parseInt(req.query.page) || 1;
+   const limit = parseInt(req.query.limit) || 5;
+   const offset = (page - 1) * limit;
+
+   // Consulta para obtener los miembros con paginación
+   conexion.query(
+      'SELECT * FROM miembros LIMIT ? OFFSET ?',
+      [limit, offset],
+      (error, miembros) => {
+         if (error) {
+            return res
+               .status(500)
+               .json({ error: 'Error al obtener los miembros' });
+         }
+
+         // Consulta para obtener el total de miembros
+         conexion.query(
+            'SELECT COUNT(*) AS total FROM miembros',
+            (error, results) => {
+               if (error) {
+                  return res
+                     .status(500)
+                     .json({ error: 'Error al contar los miembros' });
+               }
+
+               const totalCount = results[0].total;
+               const totalPages = Math.ceil(totalCount / limit);
+
+               res.json({
+                  miembros,
+                  totalPages,
+                  currentPage: page,
+               });
+            }
+         );
+      }
+   );
+
+   // conexion.query(
+   //    'SELECT COUNT(*) AS total FROM miembros',
+   //    (error, results) => {
+   //       if (error) throw error;
+   //       const totalCount = results[0].total;
+   //       console.log('Total count:', totalCount);
+   //    }
+   // );
+});
+
 // Exportar la ruta
 module.exports = rutas;
