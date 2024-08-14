@@ -364,38 +364,156 @@ rutas.get('/me', verifyToken, (req, res) => {
    res.json({ id: req.userId, username: req.username });
 });
 
-// Paginación
-rutas.get('/pag_miembros', (req, res) => {
+// Paginación directa en la ruta
+// rutas.get('/pag_miembros2', (req, res) => {
+//    const page = parseInt(req.query.page) || 1;
+//    const limit = parseInt(req.query.limit) || 5;
+//    const offset = (page - 1) * limit;
+
+//    // Consulta para obtener los miembros con paginación
+//    conexion.query(
+//       'SELECT * FROM miembros LIMIT ? OFFSET ?',
+//       [limit, offset],
+//       (error, miembros) => {
+//          if (error) {
+//             return res
+//                .status(500)
+//                .json({ error: 'Error al obtener los miembros' });
+//          }
+
+//          // Consulta para obtener el total de miembros
+//          conexion.query(
+//             'SELECT COUNT(*) AS total FROM miembros',
+//             (error, results) => {
+//                if (error) {
+//                   return res
+//                      .status(500)
+//                      .json({ error: 'Error al contar los miembros' });
+//                }
+
+//                const totalCount = results[0].total;
+//                const totalPages = Math.ceil(totalCount / limit);
+
+//                res.json({
+//                   miembros,
+//                   totalPages,
+//                   currentPage: page,
+//                });
+//             }
+//          );
+//       }
+//    );
+// });
+
+// middleware/pagination.js
+const paginatedResults = (conexion, table) => {
+   return (req, res, next) => {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 5;
+
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+
+      const results = {};
+
+      // Obtener el total de registros
+      conexion.query(
+         `SELECT COUNT(*) AS count FROM ??`,
+         [table],
+         (err, countResult) => {
+            if (err) {
+               return res.status(500).json({ message: err.message });
+            }
+
+            const totalRecords = countResult[0].count;
+            const totalPages = Math.ceil(totalRecords / limit);
+
+            if (endIndex < totalRecords) {
+               results.next = {
+                  page: page + 1,
+                  limit: limit,
+               };
+            }
+
+            if (startIndex > 0) {
+               results.previous = {
+                  page: page - 1,
+                  limit: limit,
+               };
+            }
+
+            // Obtener los registros para la página actual
+            conexion.query(
+               `SELECT * FROM ?? LIMIT ? OFFSET ?`,
+               [table, limit, startIndex],
+               (err, rows) => {
+                  if (err) {
+                     return res.status(500).json({ message: err.message });
+                  }
+
+                  results.results = rows;
+                  results.totalRecords = totalRecords;
+                  results.totalPages = totalPages;
+                  results.currentPage = page;
+                  res.paginatedResults = results;
+                  next();
+               }
+            );
+         }
+      );
+   };
+};
+
+// Miembros paginados
+rutas.get(
+   '/pag_miembros',
+   paginatedResults(conexion, 'miembros'),
+   (req, res) => {
+      res.json(res.paginatedResults);
+   }
+);
+
+// Ministerios paginados
+rutas.get(
+   '/pag_ministerios',
+   paginatedResults(conexion, 'ministerios'),
+   (req, res) => {
+      res.json(res.paginatedResults);
+   }
+);
+
+// Paginación directa en la ruta
+rutas.get('/pag_miembros_ministerios', (req, res) => {
    const page = parseInt(req.query.page) || 1;
    const limit = parseInt(req.query.limit) || 5;
    const offset = (page - 1) * limit;
 
    // Consulta para obtener los miembros con paginación
    conexion.query(
-      'SELECT * FROM miembros LIMIT ? OFFSET ?',
+      'select mm.id_miembro,concat(m.nombres," ",m.apellidos) as nombre_completo,mm.id_ministerio,mi.nombre,mm.fecha_ingreso,mm.fecha_retiro,mm.estado,mm.estado_eliminado from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio where mm.estado_eliminado = "A" LIMIT ? OFFSET ?',
       [limit, offset],
-      (error, miembros) => {
+      (error, rows) => {
          if (error) {
             return res
                .status(500)
-               .json({ error: 'Error al obtener los miembros' });
+               .json({ error: 'Error al obtener los registros' });
          }
 
          // Consulta para obtener el total de miembros
          conexion.query(
-            'SELECT COUNT(*) AS total FROM miembros',
+            'SELECT COUNT(*) AS total FROM Miembro_Ministerio WHERE estado_eliminado = "A"',
             (error, results) => {
                if (error) {
                   return res
                      .status(500)
-                     .json({ error: 'Error al contar los miembros' });
+                     .json({ error: 'Error al contar los registros' });
                }
 
                const totalCount = results[0].total;
                const totalPages = Math.ceil(totalCount / limit);
 
                res.json({
-                  miembros,
+                  rows,
                   totalPages,
                   currentPage: page,
                });
@@ -403,15 +521,6 @@ rutas.get('/pag_miembros', (req, res) => {
          );
       }
    );
-
-   // conexion.query(
-   //    'SELECT COUNT(*) AS total FROM miembros',
-   //    (error, results) => {
-   //       if (error) throw error;
-   //       const totalCount = results[0].total;
-   //       console.log('Total count:', totalCount);
-   //    }
-   // );
 });
 
 // Exportar la ruta
