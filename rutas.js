@@ -426,6 +426,7 @@ const paginatedResults = (conexion, table) => {
             }
 
             const totalRecords = countResult[0].count;
+            const totalPages = Math.ceil(totalRecords / limit);
 
             if (endIndex < totalRecords) {
                results.next = {
@@ -452,6 +453,8 @@ const paginatedResults = (conexion, table) => {
 
                   results.results = rows;
                   results.totalRecords = totalRecords;
+                  results.totalPages = totalPages;
+                  results.currentPage = page;
                   res.paginatedResults = results;
                   next();
                }
@@ -461,6 +464,7 @@ const paginatedResults = (conexion, table) => {
    };
 };
 
+// Miembros paginados
 rutas.get(
    '/pag_miembros',
    paginatedResults(conexion, 'miembros'),
@@ -468,6 +472,56 @@ rutas.get(
       res.json(res.paginatedResults);
    }
 );
+
+// Ministerios paginados
+rutas.get(
+   '/pag_ministerios',
+   paginatedResults(conexion, 'ministerios'),
+   (req, res) => {
+      res.json(res.paginatedResults);
+   }
+);
+
+// Paginación directa en la ruta
+rutas.get('/pag_miembros_ministerios', (req, res) => {
+   const page = parseInt(req.query.page) || 1;
+   const limit = parseInt(req.query.limit) || 5;
+   const offset = (page - 1) * limit;
+
+   // Consulta para obtener los miembros con paginación
+   conexion.query(
+      'select mm.id_miembro,concat(m.nombres," ",m.apellidos) as nombre_completo,mm.id_ministerio,mi.nombre,mm.fecha_ingreso,mm.fecha_retiro,mm.estado,mm.estado_eliminado from Miembro_Ministerio mm join Miembros m on mm.id_miembro = m.id_miembro join Ministerios mi on mm.id_ministerio = mi.id_ministerio where mm.estado_eliminado = "A" LIMIT ? OFFSET ?',
+      [limit, offset],
+      (error, rows) => {
+         if (error) {
+            return res
+               .status(500)
+               .json({ error: 'Error al obtener los registros' });
+         }
+
+         // Consulta para obtener el total de miembros
+         conexion.query(
+            'SELECT COUNT(*) AS total FROM Miembro_Ministerio WHERE estado_eliminado = "A"',
+            (error, results) => {
+               if (error) {
+                  return res
+                     .status(500)
+                     .json({ error: 'Error al contar los registros' });
+               }
+
+               const totalCount = results[0].total;
+               const totalPages = Math.ceil(totalCount / limit);
+
+               res.json({
+                  rows,
+                  totalPages,
+                  currentPage: page,
+               });
+            }
+         );
+      }
+   );
+});
 
 // Exportar la ruta
 module.exports = rutas;
